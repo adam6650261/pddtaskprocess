@@ -2,6 +2,7 @@ const axios  = require("axios");
 const config = require("../config");
 exports.getHttpProxy = async (pro,city) =>{
     try {
+        await addIp();
         let url = config.httpProxy.url;
         if(pro)  url += config.httpProxy.pro;
         if(city) url += config.httpProxy.city;
@@ -19,4 +20,13 @@ exports.getHttpProxy = async (pro,city) =>{
         return null; 
     }
 }
-
+async function addIp (){
+    try {
+        let address = await axios.get("https://api.ipify.org/?format=json");
+        let rel = await axios.get(config.httpProxy.whiteList + address.data.ip);
+        console.log("添加白名单",rel.data)
+        
+    } catch (error) {
+        console.log(error);
+    }
+}

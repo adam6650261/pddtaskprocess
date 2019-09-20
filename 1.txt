@@ -1,0 +1,3 @@
+div.footer-items > div:nth-child(3) //搜索框
+#main > div > div > div > div  //搜索框未点击前状态
+#submit > input  //搜索框
