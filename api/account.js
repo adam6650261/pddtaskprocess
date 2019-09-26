@@ -7,7 +7,7 @@ exports.getAccount = async ()=>{
         if(res.data.state > 0) return res.data.data;
         return null;
     } catch (error) {
-        console.log("获取账号失败!");
+        console.log("获取账号失败!"); 
         console.error(error);
         return null;   
     }

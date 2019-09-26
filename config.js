@@ -12,6 +12,10 @@ module.exports = {
         pro:"&pro=",
         city:"&city=",
         whiteList:"http://web.http.cnapi.cc/index/index/save_white?neek=30140&appkey=c60c0a0296848e5683c5eb78b963e8e7&white="
+    },
+    good:{
+        title:"富贵鸟卫衣男2019秋季韩版青少年圆领套头男装打底衫潮流长袖t恤",
+        shopName:"火麒麟男装",
+        goodId:"5860398600" //window.rawData.store.initDataObj.goods.goodsID
     }
-    
 }
