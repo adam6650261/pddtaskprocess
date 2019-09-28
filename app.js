@@ -24,18 +24,23 @@ async function task() {
     if (area) proxy = await httpProxy.getHttpProxy(area.pcode, area.ccode);
     else proxy = await httpProxy.getHttpProxy();
     console.log(proxy);
-
+    
     browser = await puppeteer.launch({
         headless: false,
-        defaultViewport: { width: 1440, height: 900 },
+        defaultViewport: { width: 1903, height: 936 },
         ignoreHTTPSErrors: false, //忽略 https 报错
         args: [
             '–no-sandbox',
             '--window-size=1920,1040',
-            `--proxy-server=${proxy.ip}`
+            `--proxy-server=${proxy.ip}`,
+            // '--no-default-browser-check',
+            // '--disable-site-isolation-for-policy',
+            // '--disable-windows10-custom-titlebar'
         ] //全屏打开页面
     });
+
     const page = await browser.newPage();
+
     page.on("console", e => {
         console.log(e.text);
     })
@@ -104,7 +109,7 @@ async function task() {
     await page.click("div.footer-items>div:nth-child(3)", { button: "left", delay: tools.random(10, 15) });
     console.log("等待点击输入框")
     await page.waitFor(tools.random(3000, 5000));
-    document.querySelector("#main > div > div.jXkdP2Qa > div > div")
+   
     await page.waitForSelector("#main>div>div.jXkdP2Qa>div");
 
     await page.waitFor(tools.random(3000, 5000));
@@ -144,6 +149,7 @@ async function task() {
         }else{
             await page.waitFor(3000);
             let good = goods[tools.random(1, goodlength)];
+            await viewToGood(page,good);
             await good.tap();
             await good.click();
             await page.waitFor(8000);
@@ -156,6 +162,36 @@ async function task() {
     }
    
 
+}
+
+async function viewToGood(page,good){
+   console.log("开始浏览到商品位置~");
+   let rect = await good.boundingBox();
+   console.log(rect);
+   let top = await getScrollTop(page);
+   let currentHeight = 0;
+   if(top > rect.y){
+       currentHeight= top;
+       while (top > rect.y-500) {
+        let time = tools.random(300, 1500);
+        let size = tools.random(-200, 500);
+        currentHeight -= size;
+        top = await getScrollTop(page)
+        await autoScroll(page, currentHeight);
+        await tools.sleep(time);
+       }
+   }else{
+    while (top < rect.y-500) {
+        let time = tools.random(300, 1500);
+        let size = tools.random(-200, 500);
+        currentHeight += size;
+        top = await getScrollTop(page)
+        await autoScroll(page, currentHeight);
+        await tools.sleep(time);
+    }
+
+   }
+   console.log("浏览完毕..~");
 }
 async function easyScroll(page,height){
     let scrollHeight = await getScrollHeight(page);
@@ -173,11 +209,12 @@ async function easyScroll(page,height){
 }
 
 async function findGoods(page,length){
+    console.log("开始查找新商品,之前的商品长度..",length);
     let scrollHeight = await getScrollHeight(page);
     let currentHeight = 0;
     let scrolltop = 0;
     while (true) {
-        let time = tools.random(300, 1500);
+        let time = tools.random(500, 1500); 
         let size = tools.random(-100, 300);
         currentHeight += size;
         await autoScroll(page, currentHeight);
