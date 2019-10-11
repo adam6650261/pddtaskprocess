@@ -14,8 +14,12 @@ module.exports = {
         whiteList:"http://web.http.cnapi.cc/index/index/save_white?neek=30140&appkey=c60c0a0296848e5683c5eb78b963e8e7&white="
     },
     good:{
-        title:"富贵鸟卫衣男2019秋季韩版青少年圆领套头男装打底衫潮流长袖t恤",
-        shopName:"火麒麟男装",
-        goodId:"5860398600" //window.rawData.store.initDataObj.goods.goodsID
+        title:"短袖男夏季原创日系潮流T恤男士半袖体恤学生韩版宽松帅气五分袖",
+        shopName:"港仔风文艺男装店",
+        goodId:13142744941, //window.rawData.store.initDataObj.goods.goodsID
+        view:1,
+        pingdan:false,
+        skus:['XG-02五分袖白色【优质面料】','2XL (135-160斤)'],
+        num:1, //"#sku-selector-body > div.sku-selector-number > div.sku-selector-increase" 
     }
 }

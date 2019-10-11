@@ -2,7 +2,7 @@ const axios  = require("axios");
 const config = require("../config");
 exports.getHttpProxy = async (pro,city) =>{
     try {
-        await addIp();
+       // await addIp();
         let url = config.httpProxy.url;
         if(pro)  url += config.httpProxy.pro;
         if(city) url += config.httpProxy.city;
