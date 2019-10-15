@@ -17,9 +17,17 @@ module.exports = {
         title:"短袖男夏季原创日系潮流T恤男士半袖体恤学生韩版宽松帅气五分袖",
         shopName:"港仔风文艺男装店",
         goodId:13142744941, //window.rawData.store.initDataObj.goods.goodsID
-        view:1,
+        view:0,//货比几家
         pingdan:false,
         skus:['XG-02五分袖白色【优质面料】','2XL (135-160斤)'],
-        num:1, //"#sku-selector-body > div.sku-selector-number > div.sku-selector-increase" 
+        num:1, //"#sku-selector-body > div.sku-selector-number > div.sku-selector-increase" ,
+        pov:"广东省",
+        city:"韶关市",
+        district:"曲江区",
+        address:"肯德基25号",
+        name:"老郭",
+        phone:"15015068458",
+        isName:"true", //是否在名称上 
+        remark:"A"
     }
 }

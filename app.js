@@ -5,6 +5,8 @@ const httpProxy = require("./comm/httpProxy");
 const account = require("./api").account;
 var FileStore = require('fs-store').FileStore;
 const tools = require("./comm/kits");
+const baidu = require("./api/map");
+
 // 构建本地存储
 const store = new FileStore('taskinfo.json');
 let browser;
@@ -21,9 +23,9 @@ async function task() {
 
     let area = await account.getAreaCode(instance.area);
     let proxy;
-    if (area) proxy = await httpProxy.getHttpProxy(area.pcode, area.ccode);
-    else proxy = await httpProxy.getHttpProxy();
-    console.log(proxy);
+    // if (area) proxy = await httpProxy.getHttpProxy(area.pcode, area.ccode);
+    // else proxy = await httpProxy.getHttpProxy();
+    // console.log(proxy);
 
     browser = await puppeteer.launch({
         headless: false,
@@ -34,7 +36,7 @@ async function task() {
         args: [
             //'–no-sandbox',
             '--window-size=1280,960',
-           // `--proxy-server=${proxy.ip}`,
+            // `--proxy-server=${proxy.ip}`,
             // '--no-default-browser-check',
             // '--disable-site-isolation-for-policy',
             // '--disable-windows10-custom-titlebar'
@@ -44,35 +46,35 @@ async function task() {
 
     const page = await browser.newPage();
     let isFind = false;
-    let goodIndex = -1; 
+    let goodIndex = -1;
     let link_Url = "";
-   // await page.setRequestInterception(true);
+    // await page.setRequestInterception(true);
     page.on('response', async res => {
 
         // if (interceptedRequest.url().endsWith('.png') || interceptedRequest.url().endsWith('.jpg'))
         //     interceptedRequest.abort();
 
         // else 
-        if (res.url().includes('proxy/api/search?source=search')){
-           if(goodIndex > -1 ) return;
-           console.log(await res.json())
-           let data  =  await res.json();
-           let len = 0;
-           if(data && data.items){
-               for (const item of data.items) {
-                   if(item.goods_id == config.good.goodId){
-                       goodIndex =  len;
-                       link_url = item.link_url;
-                       console.log("找到了",item.link_url);
-                       return;
-                   }
-                   len++;
-               }
-               goodIndex = -1;
-           }
+        if (res.url().includes('proxy/api/search?source=search')) {
+            if (goodIndex > -1) return;
+            console.log(await res.json())
+            let data = await res.json();
+            let len = 0;
+            if (data && data.items) {
+                for (const item of data.items) {
+                    if (item.goods_id == config.good.goodId) {
+                        goodIndex = len;
+                        link_url = item.link_url;
+                        console.log("找到了", item.link_url);
+                        return;
+                    }
+                    len++;
+                }
+                goodIndex = -1;
+            }
         }
         else {
-         
+
         }
     });
     await page.setDefaultNavigationTimeout(60000);
@@ -146,22 +148,23 @@ async function task() {
     //货比n家  
     let viewGoods = 0;
     console.log("开始货比三家");
-    while (config.good.view > viewGoods ) {
+    while (config.good.view > viewGoods) {
         await page.waitForSelector(".nN9FTMO2")
         goodIndex = await getFirstData(page);
-        console.log("最后的商品位置:"+ goodIndex);
+        console.log("最后的商品位置:" + goodIndex);
         let goods = await page.$$(".nN9FTMO2");
-        let tmpIndex = tools.random(1,goods.length-1);
+        
+        let tmpIndex = tools.random(1, goods.length - 1);
         let findGood = goods[tmpIndex];
-        let text =  await page.evaluate(k=> k.innerText,findGood);
+        let text = await page.evaluate(k => k.innerText, findGood);
         console.log(`商品位置:${tmpIndex}`);
         console.log(text);
-        await viewToGood(page,findGood);
+        await viewToGood(page, findGood);
         await findGood.click();
         await tools.sleep(3000);
         console.log("进入商品页面..")
         await page.waitForSelector(".bubble-container");
-        console.log("商品页渲染完毕..");    
+        console.log("商品页渲染完毕..");
         console.log("模拟浏览商品...");
         await GoodsView(page);
         viewGoods++;
@@ -171,7 +174,7 @@ async function task() {
     }
     console.log("货比结束...寻找真实商品");
     goodIndex = await getFirstData(page);
-    if(goodIndex == -1){
+    if (goodIndex == -1) {
         while (goodIndex == -1) {
             await easyScroll(page)
         }
@@ -180,22 +183,22 @@ async function task() {
     await page.waitForSelector(".nN9FTMO2")
     let goods = await page.$$(".nN9FTMO2");
     goodIndex = await getFirstData(page);
-    console.log("最后的商品位置:"+ goodIndex);
+    console.log("最后的商品位置:" + goodIndex);
     // let goods = await page.$$(".nN9FTMO2");
     // for (const o of goods) {
     //     let text = await o.$eval("._1yfk_Hvb", el => el.innerText);
     //     if(text.includes) 
     // }
     let findGood = goods[++goodIndex];
-    let text =  await page.evaluate(k=> k.innerText,findGood);
+    let text = await page.evaluate(k => k.innerText, findGood);
     while (!text.includes(config.good.title)) {
         goodIndex++;
-        if(goodIndex >= goods.length ) return console.log("没有找到该产品!");
+        if (goodIndex >= goods.length) return console.log("没有找到该产品!");
         findGood = goods[goodIndex];
-        text =  await page.evaluate(k=> k.innerText,findGood);
+        text = await page.evaluate(k => k.innerText, findGood);
     }
-    console.log("最后的商品位置:"+ goodIndex);
-    await viewToGood(page,findGood);
+    console.log("最后的商品位置:" + goodIndex);
+    await viewToGood(page, findGood);
     await findGood.click();
     await tools.sleep(3000);
     console.log("进入购买商品页面...");
@@ -204,9 +207,9 @@ async function task() {
     console.log("开始模拟浏览商品...");
     await GoodsView(page);
     console.log("模拟查看留言...");
-    if(!config.good.pingdan){
+    if (!config.good.pingdan) {
         console.log("发起拼单");
-        WaitForSelectorByClick(page,"div._3dlX1BNw",15,20);
+        WaitForSelectorByClick(page, "div._3dlX1BNw", 15, 20);
         // document.querySelector("div._3dlX1BNw")
         // page.click("div._3dlX1BNw")
     }
@@ -215,14 +218,24 @@ async function task() {
     for (const sku of config.good.skus) {
         let doms = await page.$$(".sku-spec-value");
         for (const dom of doms) {
-           let skuName =  await page.evaluate(k=> k.innerText,dom);
-           if(skuName == sku){
-               await dom.click();
-               await tools.sleep(1000);
-           }
+            let skuName = await page.evaluate(k => k.innerText, dom);
+            if (skuName == sku) {
+                await dom.click();
+                await tools.sleep(1000);
+            }
         }
     }
+    await WaitForSelectorByClick(page, "div.sku-selector-bottom", 50, 5);
+    await tools.sleep(3000);
+    await page.waitForSelector("._3z5j91cp");
+    let areaEl = await page.$("._2qissprE");
+    if (areaEl != null) {
+        AddressAddress(page);
 
+    } else {
+
+        ChangeAddress(page)
+    }
 
 
     // while(true){
@@ -266,6 +279,109 @@ async function task() {
 
 
 }
+async function ChangeAddress(page) {
+    let el = await page.$("._3fzq4R8E");
+    await el.click();
+    el = null;
+    await tools.sleep(3000);
+    el = await page.waitForSelector("._3w9DbMXk");
+    await el.click();
+    let ip = await baidu.getIpAddress();
+    if (!ip) throw new Error("获取百度定位IP失败!");
+    console.log(ip.address);
+    let addinfo = await baidu.getArea(ip.address);
+    while (!addinfo){
+        console.log("获取百度定位失败,3秒后重新获取")
+        await tools.sleep(3000);
+        addinfo = await baidu.getArea(ip.address);
+     }
+    console.log(addinfo.address);
+
+    await page.waitForSelector(".m-addr-main");
+    await page.waitForSelector("#region-selector-list-1>li>span");
+    await WaitForSelectorByClick(page,".m-addr-region",10,5)
+    await tools.sleep(1500);
+    let list = await page.$$("#region-selector-list-1>li>span");
+    for (const item of list) {
+        let k = await page.evaluate(k => k.innerText, item);
+        if (k.trim() == addinfo.province) {
+            await item.tap();
+            break;
+        }
+    }
+    await page.waitForSelector("#region-selector-list-2")
+    list = await page.$$("#region-selector-list-2>li>span");
+    for (const item of list) {
+        let k = await page.evaluate(k => k.innerText, item);
+        if (k.trim() == addinfo.city) {
+            await item.tap();
+            break;
+        }
+    }
+    await page.waitForSelector("#region-selector-list-3")
+    list = await page.$$("#region-selector-list-3>li>span");
+    for (const item of list) {
+        let k = await page.evaluate(k => k.innerText, item);
+        if (k.trim() == addinfo.area) {
+            await item.tap();
+            break;
+        }
+    }
+
+
+}
+async function AddressAddress(page) {
+    let ip = await baidu.getIpAddress();
+    if (!ip) throw new Error("获取百度定位IP失败!");
+    console.log(ip.address);
+    let addinfo = await baidu.getArea(ip.address);
+    while (!addinfo){
+       console.log("获取百度定位失败,3秒后重新获取")
+       await tools.sleep(3000);
+       addinfo = await baidu.getArea(ip.address);
+    }
+    console.log(addinfo.address);
+    let err_no = 0;
+
+    await WaitForSelectorByClick(page, "._2qissprE", 30, 5);
+
+    await page.waitForSelector(".m-addr-main");
+    await page.waitForSelector("#region-selector-list-1>li>span");
+    await WaitForSelectorByClick(page,".m-addr-region",10,5)
+    await tools.sleep(2000);
+    let list = await page.$$("#region-selector-list-1>li>span");
+    for (const item of list) {
+        let k = await page.evaluate(k => k.innerText, item);
+        if (k.trim() == addinfo.province) {
+            await item.tap();
+            break;
+        }
+    }
+    await page.waitForSelector("#region-selector-list-2")
+    list = await page.$$("#region-selector-list-2>li>span");
+    for (const item of list) {
+        let k = await page.evaluate(k => k.innerText, item);
+        if (k.trim() == addinfo.city) {
+            await item.tap();
+            break;
+        }
+    }
+    await page.waitForSelector("#region-selector-list-3")
+    list = await page.$$("#region-selector-list-3>li>span");
+    for (const item of list) {
+        let k = await page.evaluate(k => k.innerText, item);
+        if (k.trim() == addinfo.area) {
+            await item.tap();
+            break;
+        }
+    }
+    await tools.sleep(1500);
+    await page.type("#address", addinfo.name, { delay: 300 });
+    //#name
+    //#mobile
+}
+
+
 
 async function getFirstData(page) {
     return await page.evaluate(async (id) => {
@@ -297,18 +413,23 @@ async function getFirstData(page) {
 }
 
 async function WaitForSelectorByClick(page, selector, x = 5, y = 5, times = 3000) {
-    let footmenu = await page.waitForSelector(selector);
-    let box = await footmenu.boundingBox();
-    await tools.sleep(times);
-    x = box.x + x;
-    y = box.y + y;
-    console.log(`发送鼠标移动消息,位置X:${x},位置Y:${y}`)
-    await page.mouse.move(x, y, tools.random(500, 1000));
-    console.log("按下")
-    await page.mouse.down();
-    await page.waitFor(5);
-    console.log("抬起")
-    await page.mouse.up();
+    try {
+        let footmenu = await page.waitForSelector(selector);
+        let box = await footmenu.boundingBox();
+        await tools.sleep(times);
+        x = box.x + x;
+        y = box.y + y;
+        console.log(`发送鼠标移动消息,位置X:${x},位置Y:${y}`)
+        await page.mouse.move(x, y, tools.random(500, 1000));
+        console.log("按下")
+        await page.mouse.down();
+        await page.waitFor(5);
+        console.log("抬起")
+        await page.mouse.up();
+    } catch (error) {
+        console.error("点击等待元素失败,超时");
+    }
+
 }
 
 //控制滚动到商品可视区域
@@ -317,31 +438,31 @@ async function viewToGood(page, good) {
     let rect = await good.boundingBox();
     console.log(rect);
     let top = await getScrollTop(page);
-    if(rect.y > 0 && rect.y < 400 ){ 
+    if (rect.y > 0 && rect.y < 400) {
         return;
     }
     if (rect.y < 0) {
-        while (rect.y<200) {
+        while (rect.y < 200) {
             rect = await good.boundingBox();
             console.log(`滚动条位置${top},商品位置:${rect.y}`);
-            if(rect.y < -500){
+            if (rect.y < -500) {
                 let time = tools.random(300, 1500);
                 let size = tools.random(-500, 100);
                 top = await getScrollTop(page)
                 await autoScroll(page, size);
                 await tools.sleep(time);
-            }else{
+            } else {
                 let time = tools.random(300, 1500);
                 let size = tools.random(-100, -50);
                 top = await getScrollTop(page)
                 await autoScroll(page, size);
                 await tools.sleep(time);
             }
-            
+
 
         }
     } else {
-        while (rect.y>400) {
+        while (rect.y > 400) {
             rect = await good.boundingBox();
             console.log(`滚动条位置${top},商品位置:${rect.y}`);
             let time = tools.random(300, 1500);
@@ -369,7 +490,7 @@ async function easyScroll(page, height) {
         let size = tools.random(500, 1000);
         scrolltop = await getScrollTop(page); //获取当前距离
         await autoScroll(page, size);
-        await page.keyboard.down("ArrowDown", {'keyCode': 40, 'code': 'ArrowDown', 'key': 'ArrowDown'})
+        await page.keyboard.down("ArrowDown", { 'keyCode': 40, 'code': 'ArrowDown', 'key': 'ArrowDown' })
         await tools.sleep(time);
     }
 }
