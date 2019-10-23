@@ -26,3 +26,16 @@ exports.getAreaCode = async(area)=>{
     }
 
 }
+
+
+exports.getName = async()=>{
+    try {
+        let url = config.wrokApi.baseUrl + config.wrokApi.getName
+        let res = await axios.get(url);
+        if(res.data.state > 0) return res.data.name;
+        return "";
+    } catch (error) {
+        console.log(error);
+        return ""
+    }
+}

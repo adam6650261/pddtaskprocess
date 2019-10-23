@@ -153,7 +153,7 @@ async function task() {
         goodIndex = await getFirstData(page);
         console.log("最后的商品位置:" + goodIndex);
         let goods = await page.$$(".nN9FTMO2");
-        
+
         let tmpIndex = tools.random(1, goods.length - 1);
         let findGood = goods[tmpIndex];
         let text = await page.evaluate(k => k.innerText, findGood);
@@ -236,50 +236,9 @@ async function task() {
 
         ChangeAddress(page)
     }
-
-
-    // while(true){
-    //     await page.waitForSelector(".nN9FTMO2")
-    //     let goods = await page.$$(".nN9FTMO2");
-    //     goodlength = goods.length;
-    //     let findGood = null;
-
-    //     for(index;index<goods.length;index++){
-    //         try {
-    //             let text = await goods[index].$eval("._1yfk_Hvb", el => el.innerText);
-    //             if (text.includes(config.good.title)) {
-    //                  findGood == goods[index];
-    //                  console.log("找到了",text);
-    //                  continue;
-    //             }
-
-    //         } catch (error) {
-
-    //         }
-    //     }
-
-    //     if(findGood){
-    //         let re = await findGood.boundingBox();
-    //         await easyScroll(page,re.top);
-    //         await findGood.tab();
-    //     }else{
-    //         await page.waitFor(3000);
-    //         let good = goods[tools.random(1, goodlength)];
-    //         await viewToGood(page,good);
-    //         await good.tap();
-    //         await good.click();
-    //         await page.waitFor(8000);
-    //         await page.waitForSelector("div._3dlX1BNw");
-    //         await GoodsView(page);
-    //         await page.goBack();
-    //         await tools.sleep(5000);
-    //         await findGoods(page,goodlength);
-    //     }
-    // }
-
-
 }
 async function ChangeAddress(page) {
+    console.log("该账号已存在地址")
     let el = await page.$("._3fzq4R8E");
     await el.click();
     el = null;
@@ -290,43 +249,90 @@ async function ChangeAddress(page) {
     if (!ip) throw new Error("获取百度定位IP失败!");
     console.log(ip.address);
     let addinfo = await baidu.getArea(ip.address);
-    while (!addinfo){
+    while (!addinfo) {
         console.log("获取百度定位失败,3秒后重新获取")
         await tools.sleep(3000);
         addinfo = await baidu.getArea(ip.address);
-     }
-    console.log(addinfo.address);
+    }
+    console.log("当前百度定位:" + addinfo.address);
 
     await page.waitForSelector(".m-addr-main");
     await page.waitForSelector("#region-selector-list-1>li>span");
-    await WaitForSelectorByClick(page,".m-addr-region",10,5)
-    await tools.sleep(1500);
-    let list = await page.$$("#region-selector-list-1>li>span");
-    for (const item of list) {
-        let k = await page.evaluate(k => k.innerText, item);
-        if (k.trim() == addinfo.province) {
-            await item.tap();
-            break;
+
+    let regionEle = await page.$(".m-addr-region>span");
+    let regionText = await page.evaluate(k => k.innerText, regionEle);
+    console.log("账户原本收货地址:" + regionText);
+    console.log("判断与定位地址是否在一个省市")
+    if (!regionText.includes(addinfo.province) && !regionText.includes(addinfo.city)) {
+        console.log("与定位地址不一致,进行替换操作");
+       // await WaitForSelectorByClick(page, ".m-addr-region", 10, 5)
+        await regionEle.click();
+        await tools.sleep(2000);
+     
+        let list = await page.$$("#region-selector-list-1>li>span");
+        for (const item of list) {
+            let k = await page.evaluate(k => k.innerText, item);
+            if (k.trim() == addinfo.province) {
+                console.log("替换省");
+                await item.tap();
+                break;
+            }
         }
-    }
-    await page.waitForSelector("#region-selector-list-2")
-    list = await page.$$("#region-selector-list-2>li>span");
-    for (const item of list) {
-        let k = await page.evaluate(k => k.innerText, item);
-        if (k.trim() == addinfo.city) {
-            await item.tap();
-            break;
+        await page.waitForSelector("#region-selector-list-2")
+        list = await page.$$("#region-selector-list-2>li>span");
+        for (const item of list) {
+            let k = await page.evaluate(k => k.innerText, item);     
+            if (k.trim() == addinfo.city) {
+                console.log("替换市");
+                await item.tap();
+                break;
+            }
         }
-    }
-    await page.waitForSelector("#region-selector-list-3")
-    list = await page.$$("#region-selector-list-3>li>span");
-    for (const item of list) {
-        let k = await page.evaluate(k => k.innerText, item);
-        if (k.trim() == addinfo.area) {
-            await item.tap();
-            break;
+        await page.waitForSelector("#region-selector-list-3")
+        list = await page.$$("#region-selector-list-3>li>span");
+        for (const item of list) {
+            let k = await page.evaluate(k => k.innerText, item);
+            if (k.trim() == addinfo.area) {
+                console.log("替换区")
+                await item.tap();
+                break;
+            }
         }
+        await tools.sleep(1500);
+
+        let name = await account.getName();
+        if (!name) {
+            console.error("获取姓名失败,请检查是否还存在可用的姓名");
+            throw new Error("获取姓名失败,请检查是否还存在可用的姓名");
+        }
+
+
+
+        let result = await page.evaluate( () => {
+             document.getElementById('#name').value = "";
+             document.getElementById('#address').value = "";
+             document.getElementById('#mobile').value = "";
+        })
+          
+        if (config.good.remark) {
+            if (config.good.isName) {
+                await page.type("#name", `${name}${config.good.remark}`, { delay: 300 })
+                await page.type("#address", addinfo.name, { delay: 300 });
+            } else {
+                await page.type("#name", name, { delay: 300 })
+                await page.type("#address", `${addinfo.name}${config.good.remark}`, { delay: 300 });
+            }
+        } else {
+            await page.type("#address", addinfo.name, { delay: 300 });
+            await page.type("#name", name, { delay: 300 })
+        }
+        await page.type("#mobile", "15015066845", { delay: 300 })
+        await page.$(".m-addr-save").click();
+       // await WaitForSelectorByClick(".m-addr-save")
     }
+
+
+
 
 
 }
@@ -335,10 +341,10 @@ async function AddressAddress(page) {
     if (!ip) throw new Error("获取百度定位IP失败!");
     console.log(ip.address);
     let addinfo = await baidu.getArea(ip.address);
-    while (!addinfo){
-       console.log("获取百度定位失败,3秒后重新获取")
-       await tools.sleep(3000);
-       addinfo = await baidu.getArea(ip.address);
+    while (!addinfo) {
+        console.log("获取百度定位失败,3秒后重新获取")
+        await tools.sleep(3000);
+        addinfo = await baidu.getArea(ip.address);
     }
     console.log(addinfo.address);
     let err_no = 0;
@@ -347,7 +353,7 @@ async function AddressAddress(page) {
 
     await page.waitForSelector(".m-addr-main");
     await page.waitForSelector("#region-selector-list-1>li>span");
-    await WaitForSelectorByClick(page,".m-addr-region",10,5)
+    await WaitForSelectorByClick(page, ".m-addr-region", 10, 5)
     await tools.sleep(2000);
     let list = await page.$$("#region-selector-list-1>li>span");
     for (const item of list) {
@@ -376,7 +382,26 @@ async function AddressAddress(page) {
         }
     }
     await tools.sleep(1500);
-    await page.type("#address", addinfo.name, { delay: 300 });
+    let name = await account.getName();
+    if (!name) {
+        console.error("获取姓名失败,请检查是否还存在可用的姓名");
+        throw new Error("获取姓名失败,请检查是否还存在可用的姓名");
+    }
+    if (config.good.remark) {
+        if (config.good.isName) {
+            await page.type("#name", `${name}${config.good.remark}`, { delay: 300 })
+            await page.type("#address", addinfo.name, { delay: 300 });
+        } else {
+            await page.type("#name", `${name}`, { delay: 300 })
+            await page.type("#address", `${addinfo.name}${config.good.remark}`, { delay: 300 });
+        }
+    } else {
+        await page.type("#address", addinfo.name, { delay: 300 });
+        await page.type("#name", name, { delay: 300 })
+    }
+
+    await page.type("#mobile", "15015066845", { delay: 300 })
+    await WaitForSelectorByClick(".m-addr-save")
     //#name
     //#mobile
     //.m-addr-save

@@ -5,7 +5,8 @@ module.exports = {
         getAccount:"/getAccount",
         getAreaCode:"/getareacode",
         setLog:"/setLog",
-        heartbeat:"/heartbeat"
+        heartbeat:"/heartbeat",
+        getName:"/getName"
     },
     httpProxy:{
         url:"http://webapi.http.zhimacangku.com/getip?num=1&type=2&pro=&city=0&yys=100017&port=1&pack=64498&ts=0&ys=1&cs=1&lb=1&sb=0&pb=5&mr=1&regions=&spec=1",
