@@ -6,22 +6,39 @@ const account = require("./api").account;
 var FileStore = require('fs-store').FileStore;
 const tools = require("./comm/kits");
 const baidu = require("./api/map");
-
+const utility = require("utility");
+const task = require("./api").task;
+require("./jobs");
 // 构建本地存储
 const store = new FileStore('taskinfo.json');
+var taskInfo = null;
 let browser;
 let userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36';
-async function task() {
+async function start() {
     //TODO:服务器心跳间隔 15秒
     //TODO:getTask
     //getAccount
+    taskInfo = await task.getRunningTask();
+    while(!taskInfo){
+        taskInfo = await task.getTask();
+        if(!taskInfo){
+            console.log("暂时没有获取到任务...");
+            await tools.sleep(3000);
+        }
+    }
+
+    await task.changeTaskInfo(taskInfo._id,taskInfo.taskName);
+    console.log(`开始任务${taskInfo.taskName}`);
+    console.log(`正在获取可用账号...`);
     let instance = await account.getAccount();
     if (!instance) {
         console.log("没有获取到可用账号,稍后重新获取...");
         return;
     }
-
-    let area = await account.getAreaCode(instance.area);
+    await httpProxy.changeVpn(instance.area);
+    console.log(`正在获取地区对应手机信息`);
+    let area = await baidu.getPhone(instance.area);
+    console.log(area);
     let proxy;
     // if (area) proxy = await httpProxy.getHttpProxy(area.pcode, area.ccode);
     // else proxy = await httpProxy.getHttpProxy();
@@ -29,17 +46,18 @@ async function task() {
 
     browser = await puppeteer.launch({
         headless: false,
-        defaultViewport: { width: 1280, height: 870 },
+        defaultViewport: null,
         ignoreHTTPSErrors: false, //忽略 https 报错
         timeout: 60000,
         slowMo: 30,
         args: [
             //'–no-sandbox',
-            '--window-size=1280,960',
+          //  '--window-size=1280,960',
             // `--proxy-server=${proxy.ip}`,
             // '--no-default-browser-check',
             // '--disable-site-isolation-for-policy',
             // '--disable-windows10-custom-titlebar'
+            '--start-maximized '
         ],
         ignoreDefaultArgs: ['--enable-automation', '--disable-infobars']
     });
@@ -50,11 +68,6 @@ async function task() {
     let link_Url = "";
     // await page.setRequestInterception(true);
     page.on('response', async res => {
-
-        // if (interceptedRequest.url().endsWith('.png') || interceptedRequest.url().endsWith('.jpg'))
-        //     interceptedRequest.abort();
-
-        // else 
         if (res.url().includes('proxy/api/search?source=search')) {
             if (goodIndex > -1) return;
             console.log(await res.json())
@@ -62,7 +75,7 @@ async function task() {
             let len = 0;
             if (data && data.items) {
                 for (const item of data.items) {
-                    if (item.goods_id == config.good.goodId) {
+                    if (item.goods_id == taskInfo.goodId.trim()) {
                         goodIndex = len;
                         link_url = item.link_url;
                         console.log("找到了", item.link_url);
@@ -109,6 +122,7 @@ async function task() {
                 originalQuery(parameters)
         );
     });
+    console.log(instance.cookie);
     const cookie = {
         name: 'PDDAccessToken',
         value: instance.cookie,
@@ -127,7 +141,10 @@ async function task() {
     await page.waitFor(tools.random(700, 2000));
     console.log("点击个人信息导航...");
 
-    await WaitForSelectorByClick(page, "div.footer-items > div:nth-child(3) > div.footer-item-icon-wrap>img", 5, 5, 4000);
+    if(!await WaitForSelectorByClick(page, "div.footer-items > div:nth-child(3) > div.footer-item-icon-wrap>img", 5, 5, 4000)){
+        console.log("账号失效")
+        await account.removePhone(instance.phone);
+    }
     console.log("随机等待...")
     await page.waitFor(tools.random(700, 2000));
     await page.waitForSelector("._3P5hS6XQ");
@@ -139,7 +156,7 @@ async function task() {
     await page.waitFor(tools.random(3000, 5000));
     await page.waitForSelector("#submit>input")
     console.log("输入中...");
-    await page.type("#submit>input", "男装秋天", { delay: 300 });
+    await page.type("#submit>input",taskInfo.keyword.trim(), { delay: 300 });
     console.log("输入完毕,回车键按下");
     await page.keyboard.down('Enter', { 'keyCode': 13, 'code': 'Enter', 'key': 'Enter', 'text': '\r' })
     await page.waitFor(5000);
@@ -148,12 +165,11 @@ async function task() {
     //货比n家  
     let viewGoods = 0;
     console.log("开始货比三家");
-    while (config.good.view > viewGoods) {
+    while (taskInfo.view > viewGoods) {
         await page.waitForSelector(".nN9FTMO2")
         goodIndex = await getFirstData(page);
         console.log("最后的商品位置:" + goodIndex);
         let goods = await page.$$(".nN9FTMO2");
-
         let tmpIndex = tools.random(1, goods.length - 1);
         let findGood = goods[tmpIndex];
         let text = await page.evaluate(k => k.innerText, findGood);
@@ -163,13 +179,13 @@ async function task() {
         await findGood.click();
         await tools.sleep(3000);
         console.log("进入商品页面..")
-        await page.waitForSelector(".bubble-container");
+        await page.waitForSelector(".container");
         console.log("商品页渲染完毕..");
         console.log("模拟浏览商品...");
         await GoodsView(page);
         viewGoods++;
         page.goBack();
-        await tools.sleep(2000);
+        await tools.sleep(3000);
 
     }
     console.log("货比结束...寻找真实商品");
@@ -179,19 +195,14 @@ async function task() {
             await easyScroll(page)
         }
     }
-
     await page.waitForSelector(".nN9FTMO2")
     let goods = await page.$$(".nN9FTMO2");
     goodIndex = await getFirstData(page);
     console.log("最后的商品位置:" + goodIndex);
-    // let goods = await page.$$(".nN9FTMO2");
-    // for (const o of goods) {
-    //     let text = await o.$eval("._1yfk_Hvb", el => el.innerText);
-    //     if(text.includes) 
-    // }
+
     let findGood = goods[++goodIndex];
     let text = await page.evaluate(k => k.innerText, findGood);
-    while (!text.includes(config.good.title)) {
+    while (!text.includes(taskInfo.title.trim())) {
         goodIndex++;
         if (goodIndex >= goods.length) return console.log("没有找到该产品!");
         findGood = goods[goodIndex];
@@ -203,23 +214,48 @@ async function task() {
     await tools.sleep(3000);
     console.log("进入购买商品页面...");
 
-    await page.waitForSelector(".bubble-container");
+    await page.waitForSelector("#g-base");
     console.log("开始模拟浏览商品...");
     await GoodsView(page);
     console.log("模拟查看留言...");
-    if (!config.good.pingdan) {
+    if (!taskInfo.pingdan) {
         console.log("发起拼单");
         WaitForSelectorByClick(page, "div._3dlX1BNw", 15, 20);
-        // document.querySelector("div._3dlX1BNw")
-        // page.click("div._3dlX1BNw")
+    }else{
+  
+        try {
+            await page.waitForSelector("div._3dlX1BNw");
+            let el = page.$('#loacl-group-container');
+            if(!el) {
+                console.log("没有可拼单,发起拼单");
+                WaitForSelectorByClick(page, "div._3dlX1BNw", 15, 20);
+            }else{
+                console.log("拼单");
+                let len = await page.$$eval("[data-active=before-red]",e=>e.length);
+                console.log(len);
+                let e = (await page.$$("[data-active=before-red]"))[len-2];
+                await e.click();
+                try {
+                    await page.waitForSelector("._2rOiWb3Q",{timeout:5000});
+                    //参与拼单计时范围内会弹出窗口
+                    await page.click("._1G8fjEev>button");
+                } catch (error) {
+                    console.log("没有弹窗");
+                }
+            }
+
+        } catch (error) {
+            console.error(error);
+            WaitForSelectorByClick(page, "div._3dlX1BNw", 15, 20);
+        }
     }
 
     await tools.sleep(5000);
-    for (const sku of config.good.skus) {
+    for (const sku of taskInfo.skus) {
         let doms = await page.$$(".sku-spec-value");
         for (const dom of doms) {
             let skuName = await page.evaluate(k => k.innerText, dom);
-            if (skuName == sku) {
+            if (skuName == sku.trim()) {
                 await dom.click();
                 await tools.sleep(1000);
             }
@@ -230,115 +266,41 @@ async function task() {
     await page.waitForSelector("._3z5j91cp");
     let areaEl = await page.$("._2qissprE");
     if (areaEl != null) {
-        AddressAddress(page);
-
+        await AddressAddress(page,area);
     } else {
 
-        ChangeAddress(page)
+        await ChangeAddress(page,area);
     }
+    await tools.sleep(5000);
+    await page.waitForSelector("#logon_phone");
+    await task.changeTaskState(taskInfo.rid,page.url())
+    console.log(page.url());
+    console.log(await page.url());
 }
-async function ChangeAddress(page) {
+async function ChangeAddress(page,area) {
     console.log("该账号已存在地址")
     let el = await page.$("._3fzq4R8E");
     await el.click();
     el = null;
     await tools.sleep(3000);
-    el = await page.waitForSelector("._3w9DbMXk");
-    await el.click();
-    let ip = await baidu.getIpAddress();
-    if (!ip) throw new Error("获取百度定位IP失败!");
-    console.log(ip.address);
-    let addinfo = await baidu.getArea(ip.address);
-    while (!addinfo) {
-        console.log("获取百度定位失败,3秒后重新获取")
-        await tools.sleep(3000);
-        addinfo = await baidu.getArea(ip.address);
-    }
-    console.log("当前百度定位:" + addinfo.address);
-
-    await page.waitForSelector(".m-addr-main");
-    await page.waitForSelector("#region-selector-list-1>li>span");
-
-    let regionEle = await page.$(".m-addr-region>span");
-    let regionText = await page.evaluate(k => k.innerText, regionEle);
-    console.log("账户原本收货地址:" + regionText);
-    console.log("判断与定位地址是否在一个省市")
-    if (!regionText.includes(addinfo.province) && !regionText.includes(addinfo.city)) {
-        console.log("与定位地址不一致,进行替换操作");
-       // await WaitForSelectorByClick(page, ".m-addr-region", 10, 5)
-        await regionEle.click();
-        await tools.sleep(2000);
-     
-        let list = await page.$$("#region-selector-list-1>li>span");
-        for (const item of list) {
-            let k = await page.evaluate(k => k.innerText, item);
-            if (k.trim() == addinfo.province) {
-                console.log("替换省");
-                await item.tap();
-                break;
-            }
-        }
-        await page.waitForSelector("#region-selector-list-2")
-        list = await page.$$("#region-selector-list-2>li>span");
-        for (const item of list) {
-            let k = await page.evaluate(k => k.innerText, item);     
-            if (k.trim() == addinfo.city) {
-                console.log("替换市");
-                await item.tap();
-                break;
-            }
-        }
-        await page.waitForSelector("#region-selector-list-3")
-        list = await page.$$("#region-selector-list-3>li>span");
-        for (const item of list) {
-            let k = await page.evaluate(k => k.innerText, item);
-            if (k.trim() == addinfo.area) {
-                console.log("替换区")
-                await item.tap();
-                break;
-            }
-        }
-        await tools.sleep(1500);
-
-        let name = await account.getName();
-        if (!name) {
-            console.error("获取姓名失败,请检查是否还存在可用的姓名");
-            throw new Error("获取姓名失败,请检查是否还存在可用的姓名");
-        }
-
-
-
-        let result = await page.evaluate( () => {
-             document.getElementById('#name').value = "";
-             document.getElementById('#address').value = "";
-             document.getElementById('#mobile').value = "";
-        })
-          
-        if (config.good.remark) {
-            if (config.good.isName) {
-                await page.type("#name", `${name}${config.good.remark}`, { delay: 300 })
-                await page.type("#address", addinfo.name, { delay: 300 });
-            } else {
-                await page.type("#name", name, { delay: 300 })
-                await page.type("#address", `${addinfo.name}${config.good.remark}`, { delay: 300 });
-            }
-        } else {
-            await page.type("#address", addinfo.name, { delay: 300 });
-            await page.type("#name", name, { delay: 300 })
-        }
-        await page.type("#mobile", "15015066845", { delay: 300 })
-        await page.$(".m-addr-save").click();
-       // await WaitForSelectorByClick(".m-addr-save")
-    }
-
-
-
-
-
+    el = await page.waitForSelector("._2jpwbK2G");
+    el.click();
+    await tools.sleep(2000);
+    el = await page.waitForSelector(".buttons-confirm>.button:nth-child(2)");
+    el.tap();
+    await tools.sleep(5000);
+    await page.goBack();
+    await tools.sleep(4000);
+    await AddressAddress(page,area);
+   
 }
-async function AddressAddress(page) {
+async function AddressAddress(page,area) {
     let ip = await baidu.getIpAddress();
-    if (!ip) throw new Error("获取百度定位IP失败!");
+    while (!ip) {
+        console.error("百度定位失败..3秒后重新获取");
+        await tools.sleep(3000);
+        ip = await baidu.getIpAddress();
+    }
     console.log(ip.address);
     let addinfo = await baidu.getArea(ip.address);
     while (!addinfo) {
@@ -387,21 +349,39 @@ async function AddressAddress(page) {
         console.error("获取姓名失败,请检查是否还存在可用的姓名");
         throw new Error("获取姓名失败,请检查是否还存在可用的姓名");
     }
-    if (config.good.remark) {
-        if (config.good.isName) {
-            await page.type("#name", `${name}${config.good.remark}`, { delay: 300 })
+    if (taskInfo.remark) {
+        if (taskInfo.isName) {
+            await page.type("#name", `${name}${taskInfo.remark}`, { delay: 300 })
             await page.type("#address", addinfo.name, { delay: 300 });
         } else {
             await page.type("#name", `${name}`, { delay: 300 })
-            await page.type("#address", `${addinfo.name}${config.good.remark}`, { delay: 300 });
+            await page.type("#address", `${addinfo.name}${taskInfo.remark}`, { delay: 300 });
         }
     } else {
         await page.type("#address", addinfo.name, { delay: 300 });
         await page.type("#name", name, { delay: 300 })
     }
+    area.phone+=utility.randomString(4,"0123465789");
+    while(!await account.checkPhone(area.phone)){
+        console.log("手机号码被使用过,重新生成...");
+        area.phone+=utility.randomString(4,"0123465789");
+        await tools.sleep(2000);
+    }
 
-    await page.type("#mobile", "15015066845", { delay: 300 })
-    await WaitForSelectorByClick(".m-addr-save")
+
+
+    await page.type("#mobile", area.phone , { delay: 300 });
+    let eleee =  await page.$(".m-addr-save");
+    await page.tap('.m-addr-save');
+    await page.click(".m-addr-save");
+    //await WaitForSelectorByClick(".m-addr-save")
+    let pays = await page.$$("._1apMaLaW");
+    pays[1].tap();
+    pays[1].click();
+    await page.click("._3z5j91cp");
+
+    await account.addPhone(area.phone,name,taskInfo.shopName,addinfo.address,taskInfo.taskName)
+
     //#name
     //#mobile
     //.m-addr-save
@@ -434,7 +414,7 @@ async function getFirstData(page) {
             }, 500);
         });
 
-    }, config.good.goodId);
+    }, taskInfo.goodId);
 
 }
 
@@ -452,8 +432,10 @@ async function WaitForSelectorByClick(page, selector, x = 5, y = 5, times = 3000
         await page.waitFor(5);
         console.log("抬起")
         await page.mouse.up();
+        return true;
     } catch (error) {
         console.error("点击等待元素失败,超时");
+        return false;
     }
 
 }
@@ -587,4 +569,4 @@ async function autoScroll(page, size) {
         window.scrollBy(0, y);
     }, size);
 }
-task();
+start();

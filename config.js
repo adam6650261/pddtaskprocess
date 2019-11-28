@@ -3,10 +3,18 @@ module.exports = {
         baseUrl:"http://127.0.0.1:3000/api",
         token:"",
         getAccount:"/getAccount",
+        removeAccount:"/account",
         getAreaCode:"/getareacode",
         setLog:"/setLog",
         heartbeat:"/heartbeat",
-        getName:"/getName"
+        getName:"/getName",
+        getPhone: "/getPhone",
+        addPhone: "/phone",
+        checkPhone: "/checkephone",
+        getTask:"/task",
+        changeTaskState:"/taskrunning",
+        getRunningTask : "/taskrunning",
+        changeTaskInfo:"/taskInfo"
     },
     httpProxy:{
         url:"http://webapi.http.zhimacangku.com/getip?num=1&type=2&pro=&city=0&yys=100017&port=1&pack=64498&ts=0&ys=1&cs=1&lb=1&sb=0&pb=5&mr=1&regions=&spec=1",
@@ -14,21 +22,7 @@ module.exports = {
         city:"&city=",
         whiteList:"http://web.http.cnapi.cc/index/index/save_white?neek=30140&appkey=c60c0a0296848e5683c5eb78b963e8e7&white="
     },
-    good:{
-        title:"短袖男夏季原创日系潮流T恤男士半袖体恤学生韩版宽松帅气五分袖",
-        shopName:"港仔风文艺男装店",
-        goodId:13142744941, //window.rawData.store.initDataObj.goods.goodsID
-        view:0,//货比几家
-        pingdan:false,
-        skus:['XG-02五分袖白色【优质面料】','2XL (135-160斤)'],
-        num:1, //"#sku-selector-body > div.sku-selector-number > div.sku-selector-increase" ,
-        pov:"广东省",
-        city:"韶关市",
-        district:"曲江区",
-        address:"肯德基25号",
-        name:"老郭",
-        phone:"15015068458",
-        isName:"true", //是否在名称上 
-        remark:"A"
+    pcConfig:{
+        token:"702c4bd2d38d44b8bfb7cb66688aca2e"
     }
 }
