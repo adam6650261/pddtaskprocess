@@ -61,9 +61,9 @@ exports.getRunningTask = async ()=>{
     }
 }
 
-exports.changeTaskState = async(id,payUrl)=>{
+exports.changeTaskState = async(id,payUrl,aid)=>{
     let url = config.wrokApi.baseUrl + config.wrokApi.changeTaskState;
-    let body = {id,state:"待付款",payUrl};
+    let body = {id,state:"待付款",payUrl,accountId:aid};
     try {
         let res = await axios.put(url,body, {
             headers: {

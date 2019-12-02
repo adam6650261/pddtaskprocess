@@ -6,6 +6,7 @@ exports.getArea = async (area,query="小区")=>{
    let url = `http://api.map.baidu.com/place/v2/search?query=${encodeURIComponent(query)}&tag=&region=${encodeURIComponent(area)}&output=json&ak=B4cYhozuEU85gpccYV3vu5Vq5cx7FG1G&page_size=50`;
    let res = await axios.get(url);
    if(res.data.status == 0 && res.data.results.length>0 ){
+        console.log(res.data.results);
         return res.data.results[tools.random(0,res.data.results.length)];
    }
    return null;
@@ -21,7 +22,7 @@ exports.getIpAddress = async ()=>{
 }
 
 exports.getPhone = async (str)=>{
-     let reg = /(.+?)省([-\s]+)?(.+?)[市区县]/;
+     let reg = /(.+?)省([-\s]+)?(.+)([市区县]?)/;
      let tmp = reg.exec(str);
      if(!tmp || tmp.length < 4) {
           console.log(`${str} , 该地址解析出错`);

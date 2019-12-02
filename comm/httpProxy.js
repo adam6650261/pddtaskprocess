@@ -37,6 +37,7 @@ async function addIp (){
 exports.changeVpn = async (area) =>{
     let times = 0;
     try {
+        
         fs.unlinkSync("conn.bin");
     } catch (error) {
         
@@ -62,6 +63,7 @@ exports.changeVpn = async (area) =>{
     console.log("正在获取IP地址");
     try {
         await tools.sleep(1000);
+        
         let res = await axios.get("http://api.map.baidu.com/location/ip?&ak=sBmDkF3ZzGN8ez47KvTKj81CuMYnIAa3#");
         if(res.data.status == 0){
             return {ip:"无",city:`${res.data.content.address_detail.province}-${res.data.content.address_detail.city}`};

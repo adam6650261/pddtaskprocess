@@ -35,14 +35,12 @@ async function start() {
         console.log("没有获取到可用账号,稍后重新获取...");
         return;
     }
-    await httpProxy.changeVpn(instance.area);
+   await httpProxy.changeVpn(instance.area);
     console.log(`正在获取地区对应手机信息`);
     let area = await baidu.getPhone(instance.area);
+    
     console.log(area);
     let proxy;
-    // if (area) proxy = await httpProxy.getHttpProxy(area.pcode, area.ccode);
-    // else proxy = await httpProxy.getHttpProxy();
-    // console.log(proxy);
 
     browser = await puppeteer.launch({
         headless: false,
@@ -66,7 +64,7 @@ async function start() {
     let isFind = false;
     let goodIndex = -1;
     let link_Url = "";
-    // await page.setRequestInterception(true);
+    //await page.setRequestInterception(true);
     page.on('response', async res => {
         if (res.url().includes('proxy/api/search?source=search')) {
             if (goodIndex > -1) return;
@@ -197,9 +195,9 @@ async function start() {
     }
     await page.waitForSelector(".nN9FTMO2")
     let goods = await page.$$(".nN9FTMO2");
-    goodIndex = await getFirstData(page);
-    console.log("最后的商品位置:" + goodIndex);
-
+    // goodIndex = await getFirstData(page);
+    // console.log("最后的商品位置:" + goodIndex);
+    goodIndex = 0;
     let findGood = goods[++goodIndex];
     let text = await page.evaluate(k => k.innerText, findGood);
     while (!text.includes(taskInfo.title.trim())) {
@@ -271,9 +269,10 @@ async function start() {
 
         await ChangeAddress(page,area);
     }
+    console.log("地址修改完毕....");
     await tools.sleep(5000);
     await page.waitForSelector("#logon_phone");
-    await task.changeTaskState(taskInfo.rid,page.url())
+    await task.changeTaskState(taskInfo.rid,page.url(),instance._id)
     console.log(page.url());
     console.log(await page.url());
 }
@@ -283,12 +282,22 @@ async function ChangeAddress(page,area) {
     await el.click();
     el = null;
     await tools.sleep(3000);
+    console.log("正在删除原始地址....");
     el = await page.waitForSelector("._2jpwbK2G");
-    el.click();
+    while(el){
+        el.click();
+        await tools.sleep(1000);
+        let s = await page.waitForSelector(".buttons-confirm>.button:nth-child(2)");
+        s.tap();
+        await tools.sleep(4000);
+        try {
+            el = await page.waitForSelector("._2jpwbK2G",{time:3000});
+        } catch (error) {
+            el = null
+        }
+       
+    }
     await tools.sleep(2000);
-    el = await page.waitForSelector(".buttons-confirm>.button:nth-child(2)");
-    el.tap();
-    await tools.sleep(5000);
     await page.goBack();
     await tools.sleep(4000);
     await AddressAddress(page,area);
@@ -303,7 +312,7 @@ async function AddressAddress(page,area) {
     }
     console.log(ip.address);
     let addinfo = await baidu.getArea(ip.address);
-    while (!addinfo) {
+    while (!addinfo || !addinfo.province) {
         console.log("获取百度定位失败,3秒后重新获取")
         await tools.sleep(3000);
         addinfo = await baidu.getArea(ip.address);
@@ -320,7 +329,9 @@ async function AddressAddress(page,area) {
     let list = await page.$$("#region-selector-list-1>li>span");
     for (const item of list) {
         let k = await page.evaluate(k => k.innerText, item);
+        console.log(k.trim(),addinfo.province);
         if (k.trim() == addinfo.province) {
+            console.log("点击",addinfo.province);
             await item.tap();
             break;
         }
@@ -371,16 +382,27 @@ async function AddressAddress(page,area) {
 
 
     await page.type("#mobile", area.phone , { delay: 300 });
-    let eleee =  await page.$(".m-addr-save");
+   
+
     await page.tap('.m-addr-save');
     await page.click(".m-addr-save");
     //await WaitForSelectorByClick(".m-addr-save")
+
+    await tools.sleep(2000);
     let pays = await page.$$("._1apMaLaW");
     pays[1].tap();
     pays[1].click();
-    await page.click("._3z5j91cp");
+    await tools.sleep(1000);
+    try {
+        await page.tap("._3z5j91cp");
+        await page.click("._3z5j91cp");
+        await account.addPhone(area.phone,name,taskInfo.shopName,addinfo.address,taskInfo.taskName)
+    } catch (error) {
+        console.log(error)
+    }
 
-    await account.addPhone(area.phone,name,taskInfo.shopName,addinfo.address,taskInfo.taskName)
+
+
 
     //#name
     //#mobile
@@ -409,6 +431,22 @@ async function getFirstData(page) {
                         clearInterval(cabdsl);
                         return resolve(-1);
 
+                    }
+                }else if(window.rawData){
+                    if(window.rawData.store){
+                        let list = window.rawData.store.data.ssrListData.list;
+                        console.log("搜索中!");
+                        var i = -1;
+                        for (const o of list) {
+                            console.log(o.goodsID);
+                            if (o.goodsID == id) {
+                                clearInterval(cabdsl);
+                                return resolve(i);
+                            }
+                            i++;
+                        }
+                        clearInterval(cabdsl);
+                        return resolve(-1);
                     }
                 }
             }, 500);
