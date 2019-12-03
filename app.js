@@ -273,8 +273,7 @@ async function start() {
     await tools.sleep(5000);
     await page.waitForSelector("#logon_phone");
     await task.changeTaskState(taskInfo.rid,page.url(),instance._id)
-    console.log(page.url());
-    console.log(await page.url());
+    console.log("下单完毕,准备开始下一单...");
 }
 async function ChangeAddress(page,area) {
     console.log("该账号已存在地址")
@@ -341,19 +340,29 @@ async function AddressAddress(page,area) {
     for (const item of list) {
         let k = await page.evaluate(k => k.innerText, item);
         if (k.trim() == addinfo.city) {
+            console.log("点击",addinfo.city);
             await item.tap();
             break;
         }
     }
+    
     await page.waitForSelector("#region-selector-list-3")
     list = await page.$$("#region-selector-list-3>li>span");
+    let isclick = false;
     for (const item of list) {
         let k = await page.evaluate(k => k.innerText, item);
         if (k.trim() == addinfo.area) {
+            console.log("点击",addinfo.area);         
             await item.tap();
+            isclick = true;
             break;
         }
     }
+    c
+    if(isclick){
+        await list[0].tap();
+    }
+    console.log("正在填写信息。。。")
     await tools.sleep(1500);
     let name = await account.getName();
     if (!name) {
@@ -372,6 +381,7 @@ async function AddressAddress(page,area) {
         await page.type("#address", addinfo.name, { delay: 300 });
         await page.type("#name", name, { delay: 300 })
     }
+    console.log("正在获取手机号...");
     area.phone+=utility.randomString(4,"0123465789");
     while(!await account.checkPhone(area.phone)){
         console.log("手机号码被使用过,重新生成...");
@@ -380,10 +390,11 @@ async function AddressAddress(page,area) {
     }
 
 
+    await 
 
-    await page.type("#mobile", area.phone , { delay: 300 });
+    console.log("填写手机号")
+    await page.type("#mobile", area.phone , { delay: 100 });
    
-
     await page.tap('.m-addr-save');
     await page.click(".m-addr-save");
     //await WaitForSelectorByClick(".m-addr-save")
@@ -396,6 +407,7 @@ async function AddressAddress(page,area) {
     try {
         await page.tap("._3z5j91cp");
         await page.click("._3z5j91cp");
+        console.log("手机号同步到服务器中...")
         await account.addPhone(area.phone,name,taskInfo.shopName,addinfo.address,taskInfo.taskName)
     } catch (error) {
         console.log(error)
@@ -607,4 +619,14 @@ async function autoScroll(page, size) {
         window.scrollBy(0, y);
     }, size);
 }
-start();
+
+(async ()=>{
+    while(true){
+        try {
+            console.log("启动成功....")
+            await start();
+        } catch (error) {
+            console.error(error);
+        }
+    }
+})();
