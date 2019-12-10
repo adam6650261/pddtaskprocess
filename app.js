@@ -13,7 +13,9 @@ require("./jobs");
 const store = new FileStore('taskinfo.json');
 var taskInfo = null;
 let browser;
-let userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36';
+let DotChangeAccount = false;
+let instance = null;
+let userAgent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36';
 async function start() {
     //TODO:服务器心跳间隔 15秒
     //TODO:getTask
@@ -23,25 +25,27 @@ async function start() {
         taskInfo = await task.getTask();
         if(!taskInfo){
             console.log("暂时没有获取到任务...");
-            await tools.sleep(3000);
+            await tools.sleep(5000);
         }
     }
 
     await task.changeTaskInfo(taskInfo._id,taskInfo.taskName);
     console.log(`开始任务${taskInfo.taskName}`);
-    console.log(`正在获取可用账号...`);
-    let instance = await account.getAccount();
-    if (!instance) {
-        console.log("没有获取到可用账号,稍后重新获取...");
-        return;
-    }
-   await httpProxy.changeVpn(instance.area);
+    if(!DotChangeAccount){
+        console.log(`正在获取可用账号...`);
+        instance = await account.getAccount();    
+        if (!instance) {
+            console.log("没有获取到可用账号,稍后重新获取...");
+            return;
+        }
+        DotChangeAccount = false;
+    } 
+       
+    await httpProxy.changeVpn(instance.area);
     console.log(`正在获取地区对应手机信息`);
     let area = await baidu.getPhone(instance.area);
-    
+    if(!area) return console.log("手机号段获取失败,重新获取");
     console.log(area);
-    let proxy;
-
     browser = await puppeteer.launch({
         headless: false,
         defaultViewport: null,
@@ -66,9 +70,9 @@ async function start() {
     let link_Url = "";
     //await page.setRequestInterception(true);
     page.on('response', async res => {
-        if (res.url().includes('proxy/api/search?source=search')) {
+        if (res.url().includes('proxy/api/search?')) {
             if (goodIndex > -1) return;
-            console.log(await res.json())
+            console.log("搜索数据中:")
             let data = await res.json();
             let len = 0;
             if (data && data.items) {
@@ -91,9 +95,18 @@ async function start() {
     await page.setDefaultNavigationTimeout(60000);
     await page.setDefaultTimeout(60000);
     page.on("console", async e => {
+        let rrl = await e.text();
+        if(rrl.includes("with a status of 403")){
+            await account.removePhone(instance.phone);
+            throw new Error("账号登陆失效....")
+          
+        }
+        if(rrl.includes("failed: WebSocket is closed before the connection is established.")){
+            throw new Error("拼多多websocket链接失败....");
+        }
         console.log(await e.text());
     })
-    await page.setUserAgent(userAgent);
+    //await page.setUserAgent(userAgent);
     console.log(`正在处理拼多多反爬虫系统`);
     await page.evaluateOnNewDocument(() => {
         // Object.defineProperty(navigator, 'webdriver', {
@@ -137,7 +150,7 @@ async function start() {
     await page.waitForSelector(".footer-items>:last-child");
     console.log("导航栏加载完毕,随机等待一定时间...");
     await page.waitFor(tools.random(700, 2000));
-    console.log("点击个人信息导航...");
+    console.log("点击搜索导航...");
 
     if(!await WaitForSelectorByClick(page, "div.footer-items > div:nth-child(3) > div.footer-item-icon-wrap>img", 5, 5, 4000)){
         console.log("账号失效")
@@ -154,10 +167,19 @@ async function start() {
     await page.waitFor(tools.random(3000, 5000));
     await page.waitForSelector("#submit>input")
     console.log("输入中...");
-    await page.type("#submit>input",taskInfo.keyword.trim(), { delay: 300 });
+    await page.type("#submit>input",taskInfo.keyword.trim(), { delay: tools.random(60,288) });
     console.log("输入完毕,回车键按下");
+    
     await page.keyboard.down('Enter', { 'keyCode': 13, 'code': 'Enter', 'key': 'Enter', 'text': '\r' })
+    //await page.click("._2J6O_CKq");
     await page.waitFor(5000);
+    try {
+        await page.waitForSelector(".OaV9Alws",{timeout:3000});
+    } catch (error) {
+        console.log("商品页进入错误,WebSocket链接失败..更换代理,更换账号");
+        return;
+    }
+    
     goodIndex = await getFirstData(page);
     console.log(goodIndex);
     //货比n家  
@@ -177,7 +199,15 @@ async function start() {
         await findGood.click();
         await tools.sleep(3000);
         console.log("进入商品页面..")
-        await page.waitForSelector(".container");
+        try {
+            await page.waitForSelector(".container");
+          
+        } catch (error) {
+            console.log("商品页面错误,重新浏览")
+            DotChangeAccount =true;
+            return;
+        }
+
         console.log("商品页渲染完毕..");
         console.log("模拟浏览商品...");
         await GoodsView(page);
@@ -261,9 +291,9 @@ async function start() {
     }
     await WaitForSelectorByClick(page, "div.sku-selector-bottom", 50, 5);
     await tools.sleep(3000);
-    await page.waitForSelector("._3z5j91cp");
-    let areaEl = await page.$("._2qissprE");
-    if (areaEl != null) {
+    await page.waitForSelector(".oc-address");
+    let areaEl = await page.$(".oc-address-info");
+    if (areaEl == null) {
         await AddressAddress(page,area);
     } else {
 
@@ -272,12 +302,13 @@ async function start() {
     console.log("地址修改完毕....");
     await tools.sleep(5000);
     await page.waitForSelector("#logon_phone");
+    console.log("正在同步服务器订单状态....")
     await task.changeTaskState(taskInfo.rid,page.url(),instance._id)
     console.log("下单完毕,准备开始下一单...");
 }
 async function ChangeAddress(page,area) {
     console.log("该账号已存在地址")
-    let el = await page.$("._3fzq4R8E");
+    let el = await page.$(".oc-address");
     await el.click();
     el = null;
     await tools.sleep(3000);
@@ -288,7 +319,7 @@ async function ChangeAddress(page,area) {
         await tools.sleep(1000);
         let s = await page.waitForSelector(".buttons-confirm>.button:nth-child(2)");
         s.tap();
-        await tools.sleep(4000);
+        await tools.sleep(3000);
         try {
             el = await page.waitForSelector("._2jpwbK2G",{time:3000});
         } catch (error) {
@@ -296,7 +327,7 @@ async function ChangeAddress(page,area) {
         }
        
     }
-    await tools.sleep(2000);
+    await tools.sleep(1000);
     await page.goBack();
     await tools.sleep(4000);
     await AddressAddress(page,area);
@@ -309,17 +340,19 @@ async function AddressAddress(page,area) {
         await tools.sleep(3000);
         ip = await baidu.getIpAddress();
     }
-    console.log(ip.address);
+    console.log("IP地址定位",ip.address);
     let addinfo = await baidu.getArea(ip.address);
-    while (!addinfo || !addinfo.province) {
-        console.log("获取百度定位失败,3秒后重新获取")
+    console.log("小区",addinfo)
+    if (!addinfo || !addinfo.province) {
+        console.log("获取百度定位失败,切换IP重新开始")
         await tools.sleep(3000);
-        addinfo = await baidu.getArea(ip.address);
+        DotChangeAccount = true;
+        return;
     }
-    console.log(addinfo.address);
+    console.log("区域定位",addinfo.address);
     let err_no = 0;
 
-    await WaitForSelectorByClick(page, "._2qissprE", 30, 5);
+    await WaitForSelectorByClick(page, ".oc-address", 30, 10);
 
     await page.waitForSelector(".m-addr-main");
     await page.waitForSelector("#region-selector-list-1>li>span");
@@ -358,8 +391,8 @@ async function AddressAddress(page,area) {
             break;
         }
     }
-    c
-    if(isclick){
+    
+    if(!isclick){
         await list[0].tap();
     }
     console.log("正在填写信息。。。")
@@ -390,7 +423,6 @@ async function AddressAddress(page,area) {
     }
 
 
-    await 
 
     console.log("填写手机号")
     await page.type("#mobile", area.phone , { delay: 100 });
@@ -401,12 +433,20 @@ async function AddressAddress(page,area) {
 
     await tools.sleep(2000);
     let pays = await page.$$("._1apMaLaW");
-    pays[1].tap();
-    pays[1].click();
+    if(pays && pays.length > 1){
+        pays[1].tap();
+        pays[1].click();
+    }else{
+        pays = await page.$$("._1_hNPsxH");
+        pays[1].tap();
+        pays[1].click();
+    }
+ 
     await tools.sleep(1000);
     try {
-        await page.tap("._3z5j91cp");
-        await page.click("._3z5j91cp");
+        console.log("点击支付按钮");
+        await page.tap("[data-active=red]");
+        await page.click("[data-active=red]");
         console.log("手机号同步到服务器中...")
         await account.addPhone(area.phone,name,taskInfo.shopName,addinfo.address,taskInfo.taskName)
     } catch (error) {
@@ -628,5 +668,8 @@ async function autoScroll(page, size) {
         } catch (error) {
             console.error(error);
         }
+        console.log("5秒后重新获取任务")
+        await tools.sleep(5000);
+        browser.close();
     }
 })();

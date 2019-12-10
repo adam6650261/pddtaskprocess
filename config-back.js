@@ -23,7 +23,7 @@ module.exports = {
         whiteList:"http://web.http.cnapi.cc/index/index/save_white?neek=30140&appkey=c60c0a0296848e5683c5eb78b963e8e7&white="
     },
     pcConfig:{
-        token:"4ea2595d608c4ff29404f53b32c808aa" 
+        token:"702c4bd2d38d44b8bfb7cb66688aca2e"
     },
     api:{
         ip:"http://api.ip138.com/query/?datatype=json&token=a18f721bc8b7e330a8f41d9cfecbfadd"

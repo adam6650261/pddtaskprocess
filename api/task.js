@@ -13,11 +13,11 @@ exports.getTask = async () =>{
         if(res.data.state > 0){
             return res.data.data;
         }else{
-            console.log(res.data.msg);
+            onsole.log(res.data.msg);
             return null;
         }
     } catch (error) {
-        console.error(error);
+        //console.error(error);
         return null;
     }
  
